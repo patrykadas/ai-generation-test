@@ -90,9 +90,9 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
 
     console.log(`Generating image with prompt: ${fullPrompt}`);
 
-    // Call the Imagen model
+    // Call the correct image generation model
     const response = await ai.models.generateContent({
-      model: 'imagen-3.0-generate-002',
+      model: 'generate-image-002', // <--- THIS IS THE MODEL FIX!
       contents: [{ role: 'user', parts: [imagePart, { text: fullPrompt }] }],
       config: {
         safetySettings: [
