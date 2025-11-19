@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './App.css';
 
 // 🚨🚨 CRITICAL: UPDATE THIS WITH YOUR RENDER BACKEND URL 🚨🚨
-const API_BASE_URL = 'https://ai-generation-test.onrender.com';
+const API_BASE_URL = 'https://ai-generation-test-2.onrender.com';
 
 function App() {
   const [imageFile, setImageFile] = useState(null);
