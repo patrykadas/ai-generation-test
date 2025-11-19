@@ -21,8 +21,9 @@ const upload = multer({ dest: 'uploads/' });
 // --- CORS Configuration (FIXED for Render Deployment) ---
 // Add all allowed origins (local development and your live Render frontend URL)
 const allowedOrigins = [
-  'http://localhost:3000', // For local React development
-  'https://ai-generation-test-2.onrender.com', // YOUR NEW LIVE FRONTEND URL
+  'http://localhost:3000',
+  'https://ai-generation-test-1.onrender.com', // KEEP THIS ONE (because the frontend is using it)
+  'https://ai-generation-test-2.onrender.com', // ADD THIS ONE (if you decided to move the frontend here)
 ];
 
 app.use(
