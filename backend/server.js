@@ -22,7 +22,7 @@ const upload = multer({ dest: 'uploads/' });
 // Add all allowed origins (local development and your live Render frontend URL)
 const allowedOrigins = [
   'http://localhost:3000', // For local React development
-  'https://ai-generation-test-1.onrender.com', // YOUR LIVE FRONTEND URL
+  'https://ai-generation-test-2.onrender.com', // YOUR LIVE FRONTEND URL
 ];
 
 app.use(
