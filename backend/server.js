@@ -92,7 +92,7 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
 
     // Call the correct image generation model
     const response = await ai.models.generateContent({
-      model: 'generate-image-002', // <--- THIS IS THE MODEL FIX!
+      model: 'gemini-2.5-flash-image', // <--- THIS IS THE MODEL FIX!
       contents: [{ role: 'user', parts: [imagePart, { text: fullPrompt }] }],
       config: {
         safetySettings: [
