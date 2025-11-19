@@ -18,8 +18,7 @@ const port = process.env.PORT || 3001;
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const upload = multer({ dest: 'uploads/' });
 
-// --- CORS Configuration (FINAL FIX) ---
-// Allowing all known frontend domains for safety
+// --- CORS Configuration (FIXED) ---
 const allowedOrigins = [
   'http://localhost:3000', // For local React development
   'https://ai-generation-test-1.onrender.com', // Frontend 1
@@ -29,11 +28,9 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl) or if origin is in the allowed list
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        // Block origin not in the list
         callback(
           new Error(`CORS policy violation: Origin ${origin} is not allowed.`)
         );
@@ -92,7 +89,7 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
 
     // Call the correct image generation model
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // <--- THIS IS THE MODEL FIX!
+      model: 'gemini-2.5-flash-image', // Final Model ID
       contents: [{ role: 'user', parts: [imagePart, { text: fullPrompt }] }],
       config: {
         safetySettings: [
@@ -110,9 +107,9 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
       },
     });
 
-    // Check if the response contains generated images
+    // 🚨 THE CRITICAL FIX: Correctly extract base64 data from the Gemini response structure
     const generatedImageBase64 =
-      response.generatedImages?.[0]?.image?.imageBytes;
+      response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (generatedImageBase64) {
       res.json({ image: generatedImageBase64 });
