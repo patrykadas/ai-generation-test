@@ -3,8 +3,12 @@ const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
 // Load .env from project root, assuming server.js is in 'backend/'
-require('dotenv').config({ path: '../.env' }); 
-const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
+require('dotenv').config({ path: '../.env' });
+const {
+  GoogleGenAI,
+  HarmCategory,
+  HarmBlockThreshold,
+} = require('@google/genai');
 
 // --- Initialization ---
 const app = express();
@@ -18,20 +22,24 @@ const upload = multer({ dest: 'uploads/' });
 // Add all allowed origins (local development and your live Render frontend URL)
 const allowedOrigins = [
   'http://localhost:3000', // For local React development
-  'https://ai-generation-test-1.onrender.com' // YOUR LIVE FRONTEND URL
+  'https://ai-generation-test-1.onrender.com', // YOUR LIVE FRONTEND URL
 ];
 
-app.use(cors({ 
+app.use(
+  cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl) or if origin is in the allowed list
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            // Block origin not in the list
-            callback(new Error(`CORS policy violation: Origin ${origin} is not allowed.`));
-        }
-    }
-}));
+      // Allow requests with no origin (like mobile apps or curl) or if origin is in the allowed list
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        // Block origin not in the list
+        callback(
+          new Error(`CORS policy violation: Origin ${origin} is not allowed.`)
+        );
+      }
+    },
+  })
+);
 app.use(express.json());
 
 // --- Helper Functions ---
@@ -49,7 +57,7 @@ function fileToGenerativePart(path, mimeType) {
   return {
     inlineData: {
       // Read file content, convert to base64, and pass to the API
-      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
+      data: Buffer.from(fs.readFileSync(path)).toString('base64'),
       mimeType,
     },
   };
@@ -63,15 +71,74 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
   }
 
   const { path: filePath, mimetype } = req.file;
-  const { prompt } = req.body; 
-  
+  const { prompt } = req.body;
+
   if (!prompt) {
-      // Clean up file if prompt is missing
-      fs.unlinkSync(filePath);
-      return res.status(400).send('Prompt is required.');
+    // Clean up file if prompt is missing
+    fs.unlinkSync(filePath);
+    return res.status(400).send('Prompt is required.');
   }
-  
+
   let cleanupSuccessful = false;
 
   try {
     const imagePart = fileToGenerativePart(filePath, mimetype);
+
+    // Prompt focuses on dog transformation and fitting an Instastory ratio
+    const fullPrompt = `Take the provided dog image and transform it into a masterpiece as described: ${prompt}. Focus on the dog's characteristics. The output image must be perfectly optimized for an **Instagram Story (Reel) ratio**, meaning a vertical 9:16 aspect ratio.`;
+
+    console.log(`Generating image with prompt: ${fullPrompt}`);
+
+    // Call the Imagen model
+    const response = await ai.models.generateContent({
+      model: 'imagen-3.0-generate-002',
+      contents: [{ role: 'user', parts: [imagePart, { text: fullPrompt }] }],
+      config: {
+        safetySettings: [
+          {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+          },
+        ],
+        // The aspect_ratio is the key configuration for the Instastory/Reel look
+        imageGenerationConfig: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: '9:16', // Setting the vertical aspect ratio
+        },
+      },
+    });
+
+    // Check if the response contains generated images
+    const generatedImageBase64 =
+      response.generatedImages?.[0]?.image?.imageBytes;
+
+    if (generatedImageBase64) {
+      res.json({ image: generatedImageBase64 });
+    } else {
+      console.error('API Response missing image data:', response);
+      res
+        .status(500)
+        .json({ error: 'Image generation failed or returned no image data.' });
+    }
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    res.status(500).json({ error: 'Failed to generate image from API.' });
+  } finally {
+    // CRITICAL: Clean up the uploaded file, regardless of success/failure
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        cleanupSuccessful = true;
+      }
+    } catch (e) {
+      console.error('Cleanup failed for file:', filePath, e);
+      cleanupSuccessful = false;
+    }
+  }
+}); // <--- THIS CLOSES THE app.post HANDLER FUNCTION
+
+// --- Server Start ---
+app.listen(port, () => {
+  console.log(`Backend listening at http://localhost:${port}`);
+}); // <--- THIS CLOSES THE app.listen CALL
