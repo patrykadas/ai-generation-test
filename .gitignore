@@ -1,0 +1,17 @@
+# Dependency Directories
+/backend/node_modules
+/frontend/node_modules
+
+# Environment Variables (CRITICAL: Keep your API key secret)
+.env
+
+# Build Output
+/frontend/build
+
+# Multer Uploads
+/backend/uploads/*
+!/backend/uploads/.gitkeep # Optionally keep the folder tracked if empty
+
+# Logs and other OS files
+npm-debug.log*
+.DS_Store
