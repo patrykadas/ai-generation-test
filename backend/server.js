@@ -20,9 +20,9 @@ const upload = multer({ dest: 'uploads/' });
 
 // --- CORS Configuration (FIXED) ---
 const allowedOrigins = [
-  'http://localhost:3000', // For local React development
-  'https://ai-generation-test-1.onrender.com', // Frontend 1
-  'https://ai-generation-test-2.onrender.com', // Frontend 2
+  'http://localhost:3000',
+  'https://ai-generation-test-1.onrender.com',
+  'https://ai-generation-test-2.onrender.com',
 ];
 
 app.use(
@@ -107,17 +107,42 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
       },
     });
 
-    // 🚨 THE CRITICAL FIX: Correctly extract base64 data from the Gemini response structure
-    const generatedImageBase64 =
-      response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    // 🚨 FINAL CRITICAL FIX: Robustly check candidates and iterate through parts to find the image data
+    let generatedImageBase64 = null;
+
+    if (response.candidates && response.candidates.length > 0) {
+      const parts = response.candidates[0].content.parts;
+
+      for (const part of parts) {
+        // Check if the part contains inline data and if that data is an image
+        if (
+          part.inlineData &&
+          part.inlineData.mimeType &&
+          part.inlineData.mimeType.startsWith('image/')
+        ) {
+          generatedImageBase64 = part.inlineData.data;
+          break; // Found the image, exit the loop
+        }
+        // Optional: Log text if no image is found (useful for debugging)
+        if (part.text) {
+          console.log('Model returned text instead of image:', part.text);
+        }
+      }
+    }
 
     if (generatedImageBase64) {
       res.json({ image: generatedImageBase64 });
     } else {
-      console.error('API Response missing image data:', response);
+      console.error(
+        'API Response missing image data (no inline image part found):',
+        response
+      );
       res
         .status(500)
-        .json({ error: 'Image generation failed or returned no image data.' });
+        .json({
+          error:
+            'Image generation failed. Model may have returned a text description or encountered a safety policy.',
+        });
     }
   } catch (error) {
     console.error('Gemini API Error:', error);
