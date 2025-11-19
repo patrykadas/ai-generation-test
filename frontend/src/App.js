@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './App.css';
 
-// 🚨🚨 CRITICAL: UPDATE THIS WITH YOUR RENDER BACKEND URL 🚨🚨
+// 🚨 CRITICAL: This is the final correct address of the backend Web Service 🚨
 const API_BASE_URL = 'https://ai-generation-test-2.onrender.com';
 
 function App() {
@@ -43,6 +43,8 @@ function App() {
       });
 
       if (!response.ok) {
+        // Log the status in the console for better debugging
+        console.error(`HTTP error! status: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -56,9 +58,7 @@ function App() {
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError(
-        `Failed to connect to the backend: ${err.message}. Please check console.`
-      );
+      setError(`Fetch error: ${err.message}. Please check console.`);
     } finally {
       setIsLoading(false);
     }

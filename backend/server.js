@@ -18,12 +18,12 @@ const port = process.env.PORT || 3001;
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const upload = multer({ dest: 'uploads/' });
 
-// --- CORS Configuration (FIXED for Render Deployment) ---
-// Add all allowed origins (local development and your live Render frontend URL)
+// --- CORS Configuration (FINAL FIX) ---
+// Allowing all known frontend domains for safety
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://ai-generation-test-1.onrender.com', // KEEP THIS ONE (because the frontend is using it)
-  'https://ai-generation-test-2.onrender.com', // ADD THIS ONE (if you decided to move the frontend here)
+  'http://localhost:3000', // For local React development
+  'https://ai-generation-test-1.onrender.com', // Frontend 1
+  'https://ai-generation-test-2.onrender.com', // Frontend 2
 ];
 
 app.use(
@@ -137,9 +137,9 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
       cleanupSuccessful = false;
     }
   }
-}); // <--- CRITICAL CLOSING BRACKET 1: Closes the app.post handler function
+});
 
 // --- Server Start ---
 app.listen(port, () => {
   console.log(`Backend listening at http://localhost:${port}`);
-}); // <--- CRITICAL CLOSING BRACKET 2: Closes the app.listen call and ends the file
+});
