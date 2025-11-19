@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import './App.css';
 
-// 🚨 CRITICAL: This is the final correct address of the backend Web Service 🚨
+// CRITICAL: This is the final correct address of the backend Web Service
 const API_BASE_URL = 'https://ai-generation-test-2.onrender.com';
 
 function App() {
   const [imageFile, setImageFile] = useState(null);
-  const [prompt, setPrompt] = useState('');
+  // Removed prompt state
   const [generatedImage, setGeneratedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -16,17 +16,14 @@ function App() {
     setGeneratedImage(null); // Clear previous image on new file selection
   };
 
-  const handlePromptChange = (e) => {
-    setPrompt(e.target.value);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setGeneratedImage(null);
 
-    if (!imageFile || !prompt) {
-      setError('Please select an image and enter a prompt.');
+    if (!imageFile) {
+      // Simplified validation
+      setError('Please select an image.');
       return;
     }
 
@@ -34,7 +31,7 @@ function App() {
 
     const formData = new FormData();
     formData.append('image', imageFile);
-    formData.append('prompt', prompt);
+    // Removed prompt from formData
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/transform`, {
@@ -43,7 +40,6 @@ function App() {
       });
 
       if (!response.ok) {
-        // Log the status in the console for better debugging
         console.error(`HTTP error! status: ${response.status}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -51,7 +47,6 @@ function App() {
       const data = await response.json();
 
       if (data.image) {
-        // The API returns the image as a base64 string
         setGeneratedImage(`data:image/jpeg;base64,${data.image}`);
       } else {
         setError('API did not return a generated image.');
@@ -67,7 +62,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🐕 Dog Portrait Masterpiece Generator 🎨</h1>
+        <h1>🐕 Dog Portrait Masterpiece Generator 👑</h1>
       </header>
 
       <div className="container">
@@ -80,14 +75,11 @@ function App() {
             required
           />
 
-          <h2>2. Enter Transformation Prompt</h2>
-          <textarea
-            placeholder="e.g., 'Turn the dog into a Baroque painting with a royal background and a crown.'"
-            value={prompt}
-            onChange={handlePromptChange}
-            rows="4"
-            required
-          ></textarea>
+          <h2>2. Transformation: Aristocratic Portrait</h2>
+          <p>
+            Your dog will be automatically transformed into an **18th-century
+            aristocratic oil painting**.
+          </p>
 
           <button type="submit" disabled={isLoading}>
             {isLoading ? 'Generating...' : 'Generate Portrait'}
@@ -107,10 +99,7 @@ function App() {
           )}
 
           {!isLoading && !generatedImage && !error && (
-            <p>
-              Upload an image and enter a prompt to start your AI
-              transformation.
-            </p>
+            <p>Upload an image to start your AI transformation.</p>
           )}
         </div>
       </div>

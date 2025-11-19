@@ -20,9 +20,9 @@ const upload = multer({ dest: 'uploads/' });
 
 // --- CORS Configuration (FIXED) ---
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://ai-generation-test-1.onrender.com',
-  'https://ai-generation-test-2.onrender.com',
+  'http://localhost:3000', // For local React development
+  'https://ai-generation-test-1.onrender.com', // Frontend 1
+  'https://ai-generation-test-2.onrender.com', // Frontend 2
 ];
 
 app.use(
@@ -69,21 +69,21 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
   }
 
   const { path: filePath, mimetype } = req.file;
-  const { prompt } = req.body;
+  // Removed const { prompt } = req.body;
 
-  if (!prompt) {
-    // Clean up file if prompt is missing
-    fs.unlinkSync(filePath);
-    return res.status(400).send('Prompt is required.');
-  }
+  // 🚨 NEW: Hardcoded, fixed prompt
+  const FIXED_PROMPT =
+    '18th-century aristocratic oil painting of a Pomeranian based on the provided dog. Sitting proudly on a plush crimson velvet cushion trimmed in gold. Wearing three strands of luminous pearls. Surrounding scene: Baroque drapery in deep reds and greens, fleur-de-lis patterns, carved gilded furniture, and a classical still-life with grapes, a crystal decanter, and wine glasses. Warm Rembrandt-style lighting, painterly brush texture, exquisite fur detail, royal and theatrical atmosphere. Noble portraiture of the French court.';
+
+  // Removed prompt validation
 
   let cleanupSuccessful = false;
 
   try {
     const imagePart = fileToGenerativePart(filePath, mimetype);
 
-    // Prompt focuses on dog transformation and fitting an Instastory ratio
-    const fullPrompt = `Take the provided dog image and transform it into a masterpiece as described: ${prompt}. Focus on the dog's characteristics. The output image must be perfectly optimized for an **Instagram Story (Reel) ratio**, meaning a vertical 9:16 aspect ratio.`;
+    // Use the fixed prompt
+    const fullPrompt = `Take the provided dog image and transform it into a masterpiece as described: ${FIXED_PROMPT}. Focus on the dog's characteristics. The output image must be perfectly optimized for an **Instagram Story (Reel) ratio**, meaning a vertical 9:16 aspect ratio.`;
 
     console.log(`Generating image with prompt: ${fullPrompt}`);
 
@@ -107,23 +107,21 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
       },
     });
 
-    // 🚨 FINAL CRITICAL FIX: Robustly check candidates and iterate through parts to find the image data
+    // Correctly extract base64 data
     let generatedImageBase64 = null;
 
     if (response.candidates && response.candidates.length > 0) {
       const parts = response.candidates[0].content.parts;
 
       for (const part of parts) {
-        // Check if the part contains inline data and if that data is an image
         if (
           part.inlineData &&
           part.inlineData.mimeType &&
           part.inlineData.mimeType.startsWith('image/')
         ) {
           generatedImageBase64 = part.inlineData.data;
-          break; // Found the image, exit the loop
+          break;
         }
-        // Optional: Log text if no image is found (useful for debugging)
         if (part.text) {
           console.log('Model returned text instead of image:', part.text);
         }
@@ -148,7 +146,7 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
     console.error('Gemini API Error:', error);
     res.status(500).json({ error: 'Failed to generate image from API.' });
   } finally {
-    // CRITICAL: Clean up the uploaded file, regardless of success/failure
+    // CRITICAL: Clean up the uploaded file
     try {
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
