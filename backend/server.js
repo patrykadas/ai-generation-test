@@ -2,7 +2,6 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
-// Load .env from project root, assuming server.js is in 'backend/'
 require('dotenv').config({ path: '../.env' });
 const {
   GoogleGenAI,
@@ -14,15 +13,15 @@ const {
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Initialize GoogleGenAI client
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// CRITICAL CHANGE: Use upload.any() to accept multiple files
 const upload = multer({ dest: 'uploads/' });
 
 // --- CORS Configuration (FIXED) ---
 const allowedOrigins = [
-  'http://localhost:3000', // For local React development
-  'https://ai-generation-test-1.onrender.com', // Frontend 1
-  'https://ai-generation-test-2.onrender.com', // Frontend 2
+  'http://localhost:3000',
+  'https://ai-generation-test-1.onrender.com',
+  'https://ai-generation-test-2.onrender.com',
 ];
 
 app.use(
@@ -43,10 +42,7 @@ app.use(express.json());
 // --- Helper Functions ---
 
 /**
- * Converts a local file path to a GenerativePart object for the Gemini API.
- * @param {string} path - The local file path.
- * @param {string} mimeType - The file's MIME type.
- * @returns {object} A GenerativePart object with inline data.
+ * Converts a local file path to a GenerativePart object.
  */
 function fileToGenerativePart(path, mimeType) {
   if (!fs.existsSync(path)) {
@@ -54,7 +50,6 @@ function fileToGenerativePart(path, mimeType) {
   }
   return {
     inlineData: {
-      // Read file content, convert to base64, and pass to the API
       data: Buffer.from(fs.readFileSync(path)).toString('base64'),
       mimeType,
     },
@@ -63,97 +58,114 @@ function fileToGenerativePart(path, mimeType) {
 
 // --- API Endpoint ---
 
-app.post('/api/transform', upload.single('image'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).send('No file uploaded.');
+app.post('/api/transform', upload.any(), async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).send('No files uploaded.');
   }
 
-  const { path: filePath, mimetype } = req.file;
-  // Removed const { prompt } = req.body;
+  // 🚨 FIXED PROMPT 1
+  const PROMPT_STUDIO_PORTRAIT =
+    'Create a soft-lit studio portrait of this dog, in the style of modern fashion photography. Flat backdrop, minimal styling, neutral tones. Maintain the dog’s exact facial features. Editorial lighting, 85mm lens, shallow depth of field.';
+  // 🚨 FIXED PROMPT 2
+  const PROMPT_MAGAZINE_COVER =
+    'Generate a fashion magazine cover crop using this dog. Show only part of the face or collarbone area in a dramatic, editorial composition. Muted fashion palette, serif masthead placeholder, clean minimal layout. Make it feel like Vogue or Self Service magazine.';
 
-  // 🚨 NEW: Hardcoded, fixed prompt
-  const FIXED_PROMPT =
-    '18th-century aristocratic oil painting of a Pomeranian based on the provided dog. Sitting proudly on a plush crimson velvet cushion trimmed in gold. Wearing three strands of luminous pearls. Surrounding scene: Baroque drapery in deep reds and greens, fleur-de-lis patterns, carved gilded furniture, and a classical still-life with grapes, a crystal decanter, and wine glasses. Warm Rembrandt-style lighting, painterly brush texture, exquisite fur detail, royal and theatrical atmosphere. Noble portraiture of the French court.';
-
-  // Removed prompt validation
-
+  let filePaths = [];
   let cleanupSuccessful = false;
+  let allGeneratedImagesBase64 = [];
 
   try {
-    const imagePart = fileToGenerativePart(filePath, mimetype);
-
-    // Use the fixed prompt
-    const fullPrompt = `Take the provided dog image and transform it into a masterpiece as described: ${FIXED_PROMPT}. Focus on the dog's characteristics. The output image must be perfectly optimized for an **Instagram Story (Reel) ratio**, meaning a vertical 9:16 aspect ratio.`;
-
-    console.log(`Generating image with prompt: ${fullPrompt}`);
-
-    // Call the correct image generation model
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Final Model ID
-      contents: [{ role: 'user', parts: [imagePart, { text: fullPrompt }] }],
-      config: {
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-        ],
-        // The aspect_ratio is the key configuration for the Instastory/Reel look
-        imageGenerationConfig: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '9:16', // Setting the vertical aspect ratio
-        },
-      },
+    const imageParts = req.files.map((file) => {
+      filePaths.push(file.path);
+      return fileToGenerativePart(file.path, file.mimetype);
     });
 
-    // Correctly extract base64 data
-    let generatedImageBase64 = null;
+    // Helper function to call the API for a given prompt
+    const generateImageWithPrompt = async (promptText) => {
+      const fullPrompt = `Based on the provided dog image(s): ${promptText}. Focus on the dog's characteristics, pose, and face from the input photo(s). The output image must be perfectly optimized for an **Instagram Story (Reel) ratio**, meaning a vertical 9:16 aspect ratio.`;
 
-    if (response.candidates && response.candidates.length > 0) {
-      const parts = response.candidates[0].content.parts;
+      const contents = [...imageParts, { text: fullPrompt }];
 
-      for (const part of parts) {
-        if (
-          part.inlineData &&
-          part.inlineData.mimeType &&
-          part.inlineData.mimeType.startsWith('image/')
-        ) {
-          generatedImageBase64 = part.inlineData.data;
-          break;
-        }
-        if (part.text) {
-          console.log('Model returned text instead of image:', part.text);
+      console.log(`Generating with prompt: ${promptText}`);
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: contents,
+        config: {
+          safetySettings: [
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+          ],
+          imageGenerationConfig: {
+            numberOfImages: 1,
+            outputMimeType: 'image/jpeg',
+            aspectRatio: '9:16',
+          },
+        },
+      });
+
+      // Correctly extract base64 data
+      let generatedImageBase64 = null;
+      if (response.candidates && response.candidates.length > 0) {
+        const parts = response.candidates[0].content.parts;
+        for (const part of parts) {
+          if (
+            part.inlineData &&
+            part.inlineData.mimeType &&
+            part.inlineData.mimeType.startsWith('image/')
+          ) {
+            generatedImageBase64 = part.inlineData.data;
+            break;
+          }
+          if (part.text) {
+            console.log(
+              'Model returned text instead of image (for prompt):',
+              promptText,
+              part.text
+            );
+          }
         }
       }
-    }
+      return generatedImageBase64;
+    };
 
-    if (generatedImageBase64) {
-      res.json({ image: generatedImageBase64 });
+    // 🚨 CRITICAL CHANGE: Make two separate, sequential API calls
+    const studioPortrait = await generateImageWithPrompt(
+      PROMPT_STUDIO_PORTRAIT
+    );
+    const magazineCover = await generateImageWithPrompt(PROMPT_MAGAZINE_COVER);
+
+    if (studioPortrait && magazineCover) {
+      allGeneratedImagesBase64.push(studioPortrait);
+      allGeneratedImagesBase64.push(magazineCover);
+      res.json({ images: allGeneratedImagesBase64 }); // Return array under key 'images'
     } else {
-      console.error(
-        'API Response missing image data (no inline image part found):',
-        response
-      );
+      console.error('API Response missing one or both image data.');
       res
         .status(500)
         .json({
           error:
-            'Image generation failed. Model may have returned a text description or encountered a safety policy.',
+            'Image generation failed for one or both outputs. Check backend logs for specific failure.',
         });
     }
   } catch (error) {
     console.error('Gemini API Error:', error);
     res.status(500).json({ error: 'Failed to generate image from API.' });
   } finally {
-    // CRITICAL: Clean up the uploaded file
+    // CRITICAL: Clean up ALL uploaded files
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      if (filePaths.length > 0) {
+        filePaths.forEach((filePath) => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
         cleanupSuccessful = true;
       }
     } catch (e) {
-      console.error('Cleanup failed for file:', filePath, e);
+      console.error('Cleanup failed for files:', e);
       cleanupSuccessful = false;
     }
   }
